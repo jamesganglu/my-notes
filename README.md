@@ -7,7 +7,7 @@ Note types:
 - **Plain text**
 - **Markdown** — live preview while editing
 - **Code snippets** — syntax highlighting and a copy button
-- **Passwords** — username/URL fields, hidden until revealed, password generator; encrypted at rest (AES-256-GCM)
+- **Passwords** — username/URL fields, hidden until revealed, password generator; encrypted at rest (AES-256-GCM); revealing or copying needs a PIN (server-checked, scrypt-hashed, with lockout after repeated wrong PINs)
 - **Change logs** — versions with Added/Changed/Fixed/… entries in [Keep a Changelog](https://keepachangelog.com) format; copy as Markdown
 - **To-do lists** — tick items off from the view, optional due dates with overdue highlighting, progress bar
 
@@ -25,6 +25,7 @@ Requires **Node.js 10.12 – 18**. The app uses Express 4 and `better-sqlite3` 7
 npm install
 npm start        # http://127.0.0.1:3000
 npm run dev      # auto-restart on changes (nodemon)
+npm run reset-pin  # forgot the PIN? removes it (passwords are unaffected)
 ```
 
 ## Configuration
@@ -43,7 +44,10 @@ Data lives in `data/notes.db`. Password notes are encrypted with a key from `dat
 | Method | Path                       | Description                                            |
 | ------ | -------------------------- | ------------------------------------------------------ |
 | GET    | `/api/notes`               | List notes; query params `q`, `type`, `category`, `tag` |
-| GET    | `/api/notes/:id`           | Get a note; add `?reveal=1` to decrypt a password       |
+| GET    | `/api/notes/:id`           | Get a note (password content is always `null`)          |
+| POST   | `/api/notes/:id/reveal`    | Body `{ pin }` → `{ content }`: the decrypted password. 401 wrong PIN, 409 no PIN set, 429 locked out (with `Retry-After`) |
+| GET    | `/api/pin`                 | `{ set }`: whether a PIN exists                        |
+| POST   | `/api/pin`                 | Body `{ pin }` to create the PIN, or `{ pin, currentPin }` to change it |
 | POST   | `/api/notes`               | Create a note                                          |
 | PUT    | `/api/notes/:id`           | Update a note                                          |
 | DELETE | `/api/notes/:id`           | Delete a note                                          |

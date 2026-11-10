@@ -3,6 +3,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const { loadKey, createCipher } = require('./crypto');
 const { postgresSchema, postgresDump } = require('./postgres');
+const { PIN_PATTERN, PinError, hashPin, pinMatches, createLimiter } = require('./pin');
 
 const NOTE_TYPES = ['text', 'code', 'password', 'markdown', 'changelog', 'todo'];
 // Keep a Changelog sections, in display order.
@@ -81,6 +82,10 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
     );
     CREATE INDEX IF NOT EXISTS idx_notes_category ON notes(category);
     CREATE INDEX IF NOT EXISTS idx_notes_type ON notes(type);
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   const stmts = {
@@ -102,7 +107,27 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
                             WHERE category <> '' GROUP BY category ORDER BY category COLLATE NOCASE`),
     tags: db.prepare(`SELECT t.name, COUNT(nt.note_id) AS count FROM tags t
                       JOIN note_tags nt ON nt.tag_id = t.id GROUP BY t.id ORDER BY t.name`),
+    getSetting: db.prepare('SELECT value FROM settings WHERE key = ?').pluck(),
+    setSetting: db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)
+                           ON CONFLICT(key) DO UPDATE SET value = excluded.value`),
+    deleteSetting: db.prepare('DELETE FROM settings WHERE key = ?'),
   };
+
+  // Guards password reveal and PIN changes. The PIN hash is read on every check, so
+  // `npm run reset-pin` takes effect without restarting the server.
+  const pinLimiter = createLimiter();
+  function verifyPin(pin) {
+    const stored = stmts.getSetting.get('pin');
+    if (!stored) throw new PinError('No PIN has been set yet.', 409, { pinNotSet: true });
+    pinLimiter.check();
+    if (!pinMatches(str(pin), stored)) {
+      const left = pinLimiter.fail();
+      throw new PinError(left
+        ? `Wrong PIN. ${left} attempt${left === 1 ? '' : 's'} left before a lockout.`
+        : 'Wrong PIN. Too many wrong attempts, so PIN entry is locked for a while.', 401);
+    }
+    pinLimiter.succeed();
+  }
 
   function normalize(input) {
     const type = NOTE_TYPES.includes(input.type) ? input.type : null;
@@ -138,10 +163,11 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
     stmts.pruneTags.run();
   }
 
-  function hydrate(row, { reveal = false } = {}) {
+  // Password content is never returned here; use revealPassword() with the PIN.
+  function hydrate(row) {
     if (!row) return null;
     const note = { ...row, tags: stmts.tagsFor.all(row.id).map((t) => t.name) };
-    if (note.type === 'password') note.content = reveal ? cipher.decrypt(note.content) : null;
+    if (note.type === 'password') note.content = null;
     return note;
   }
 
@@ -178,9 +204,25 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
                    ORDER BY n.updated_at DESC, n.id DESC`;
       return db.prepare(sql).all(params).map((r) => hydrate(r));
     },
-    get(id, opts) {
-      return hydrate(stmts.get.get(id), opts);
+    get(id) {
+      return hydrate(stmts.get.get(id));
     },
+    // Returns the decrypted password, null if there's no such note; throws PinError on a bad PIN.
+    revealPassword(id, pin) {
+      verifyPin(pin);
+      const row = stmts.get.get(id);
+      if (!row) return null;
+      if (row.type !== 'password') throw new ValidationError('Only password notes can be revealed');
+      return cipher.decrypt(row.content);
+    },
+    pinIsSet: () => Boolean(stmts.getSetting.get('pin')),
+    // Sets the first PIN, or changes it (then currentPin must be correct).
+    setPin(pin, currentPin) {
+      if (!PIN_PATTERN.test(str(pin))) throw new ValidationError('The PIN must be 4 to 8 digits');
+      if (stmts.getSetting.get('pin')) verifyPin(currentPin);
+      stmts.setSetting.run('pin', hashPin(str(pin)));
+    },
+    clearPin: () => stmts.deleteSetting.run('pin').changes > 0,
     create: db.transaction((input) => {
       const { lastInsertRowid } = stmts.insert.run(normalize(input));
       setTags(lastInsertRowid, input.tags);
@@ -262,4 +304,4 @@ function normalizeTodo(content) {
 
 class ValidationError extends Error {}
 
-module.exports = { openStore, ValidationError, NOTE_TYPES, CHANGE_KINDS };
+module.exports = { openStore, ValidationError, PinError, NOTE_TYPES, CHANGE_KINDS };

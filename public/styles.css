@@ -220,11 +220,24 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .todo-edit-row.done input.todo-edit-text { text-decoration: line-through; color: var(--muted); }
 .todo-editor .add-item { align-self: flex-start; font-size: 12px; }
 
+/* PIN dialog */
+.modal { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, .55); }
+.modal[hidden] { display: none; }
+.modal-box { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; padding: 20px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 10px 40px rgba(0, 0, 0, .4); }
+.modal-box h2 { margin: 0; font-size: 18px; }
+.modal-box .pin-text { margin: 0; color: var(--muted); }
+.modal-box input { font-size: 20px; letter-spacing: .3em; text-align: center; font-family: ui-monospace, Consolas, monospace; }
+.modal-box input[hidden] { display: none; }
+.modal-box .pin-error { margin: 0; min-height: 1.5em; color: var(--danger); }
+.modal-box .actions { justify-content: flex-end; }
+.modal-box .actions button { min-width: 80px; }
+#change-pin { width: 100%; }
+
 /* ---------- print: only the open note, black on white ---------- */
 @media print {
   html, body { height: auto; background: #fff; color: #000; }
   body { display: block; font-size: 11pt; }
-  .sidebar, .list, .actions, .copy-btn, .changelog-toolbar, .todo-toolbar, .empty { display: none !important; }
+  .sidebar, .list, .actions, .copy-btn, .changelog-toolbar, .todo-toolbar, .empty, .modal { display: none !important; }
   .todo-list.hide-done li.done { display: flex; } /* print the whole list */
   .todo-list li { border-bottom-color: #ccc; break-inside: avoid; }
   .todo-due.overdue, .todo-due.today { color: #000; }

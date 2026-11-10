@@ -48,6 +48,9 @@
          title="Schema plus all notes, tags and links as PostgreSQL INSERT statements">Postgres dump</a>
     </div>
 
+    <h3>Security</h3>
+    <button type="button" id="change-pin" title="The PIN is needed to reveal or copy passwords">Set PIN</button>
+
     <h3>Theme</h3>
     <div class="theme-switch" role="group" aria-label="Theme">
       <button type="button" data-theme-choice="light">White</button>
@@ -63,6 +66,21 @@
   <main id="detail" class="detail">
     <div class="empty">Select a note or create a new one.</div>
   </main>
+
+  <div id="pin-modal" class="modal" hidden>
+    <form class="modal-box" autocomplete="off" novalidate>
+      <h2 class="pin-title"></h2>
+      <p class="pin-text"></p>
+      <input name="current" type="password" inputmode="numeric" maxlength="8" placeholder="Current PIN" aria-label="Current PIN" />
+      <input name="pin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" aria-label="PIN" />
+      <input name="confirm" type="password" inputmode="numeric" maxlength="8" placeholder="Repeat new PIN" aria-label="Repeat new PIN" />
+      <p class="pin-error" role="alert"></p>
+      <div class="actions">
+        <button type="submit" class="primary pin-submit">OK</button>
+        <button type="button" class="pin-cancel">Cancel</button>
+      </div>
+    </form>
+  </div>
 
   <template id="view-tpl">
     <header class="detail-head">

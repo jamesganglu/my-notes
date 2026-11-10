@@ -80,7 +80,7 @@ The window has three columns:
 
 | Column | What it holds |
 | --- | --- |
-| **Sidebar** (left) | From top to bottom: the **+ New note** button, the search box, filters for **Type**, **Categories** and **Tags**, the **Export** buttons, and the **Theme** buttons. |
+| **Sidebar** (left) | From top to bottom: the **+ New note** button, the search box, filters for **Type**, **Categories** and **Tags**, the **Export** buttons, the **Set PIN** / **Change PIN** button under **Security**, and the **Theme** buttons. |
 | **Note list** (middle) | The notes that match your current search or filters, most recently edited first. Each entry shows its type badge, title, category and a short summary — a preview of the text, the username for passwords, the latest version for change logs, or progress for to-do lists. While you're searching or filtering, a line at the top shows how many notes match. |
 | **Detail pane** (right) | The selected note, or the editor when you are creating or changing a note. |
 
@@ -131,9 +131,21 @@ A password note has these fields instead of a text box:
 | **URL** | Optional. Shown as a clickable link that opens in a new tab. |
 | **Password** | Hidden as you type. Click **Show** to see it, or **Generate** to create a strong random 20-character password. |
 
-When viewing a password note, the password is masked (`••••••••`). Click **Reveal** to show it, **Hide** to mask it again, or **Copy** to copy it to the clipboard without displaying it. The username also has a **Copy** button.
+When viewing a password note, the password is masked (`••••••••`). Click **Reveal** to show it, **Hide** to mask it again, or **Copy** to copy it to the clipboard without displaying it. The username also has a **Copy** button, which doesn't need a PIN.
 
 Passwords are stored **encrypted** in the database. See [Security notes](#9-security-notes).
+
+#### The PIN
+
+Revealing or copying a password needs your **PIN** — a number of 4 to 8 digits.
+
+- **First time:** the first time you click **Reveal** or **Copy**, the app asks you to create a PIN. Type it twice and click **Create PIN**.
+- **After that:** each time you reveal or copy a password, type your PIN and click **Unlock** (or press **Enter**). Once you've unlocked a password, you can reveal and copy it as often as you like until you open another note — then the PIN is asked for again.
+- **Wrong PIN:** the dialog tells you how many attempts are left. After **5 wrong PINs in a row**, PIN entry is locked for 30 seconds. Each further wrong PIN doubles the wait (1 minute, 2 minutes, …) up to 15 minutes. Entering the correct PIN resets the count.
+- **Changing the PIN:** click **Change PIN** under **Security** in the sidebar, enter your current PIN, then the new one twice. (Before a PIN exists, the button says **Set PIN**.)
+- **Forgotten PIN:** stop the app, run `npm run reset-pin` in the project folder, and start the app again. You'll be asked to create a new PIN the next time you reveal a password. Your passwords are not affected — they're encrypted with the app's key, not with the PIN.
+
+**Editing a password note** doesn't need the PIN, and the editor never shows the current password: the password field starts empty. Leave it empty to keep the current password, or type a new one to replace it.
 
 ### Change log
 
@@ -265,7 +277,7 @@ Only the note itself is printed — the sidebar, note list and buttons are left 
 
 You can change the type of an existing note in the editor, but some content doesn't carry over. Copy anything you need first.
 
-- Changing **to or from a password** note replaces the content: a password becomes whatever is in the text box (empty by default), and text becomes whatever is in the password field (empty by default). Changing away from a password also removes the username and URL.
+- Changing **to or from a password** note replaces the content: a password becomes whatever is in the text box (empty by default), and text becomes whatever is in the password field (empty by default). Changing away from a password also removes the username and URL. Since the editor doesn't show the current password, reveal and copy it (with your PIN) before changing the type if you still need it.
 - Changing a **code** note to another type removes its language setting.
 - Changing a **change log** or **to-do list** to another type removes all of its versions or items, and changing another type to one of these removes the existing text.
 
@@ -319,12 +331,14 @@ Things to know:
 - **Tag names stay unique regardless of capitalisation**, as in the app.
 - **Change log and to-do list content is JSON** stored in a text column. In PostgreSQL you can query it with `content::jsonb`.
 - **Passwords stay encrypted** in the dump, exactly as stored in the app. They can only be decrypted with your `secret.key` (or `NOTES_SECRET`), so a dump file doesn't expose your passwords on its own. Everything else in the dump is readable text — store it as carefully as your notes.
+- **Your PIN is not exported.**
 
 ---
 
 ## 9. Security notes
 
 - **Passwords are encrypted** (AES-256-GCM). Someone who gets hold of `notes.db` alone can't read them. Someone who gets the whole `data` folder, including `secret.key`, can — so protect that folder and your backups. To keep the key out of the folder entirely, use `NOTES_SECRET` (see [Settings](#10-settings)).
+- **The PIN protects passwords inside the app.** It's checked by the server, so it can't be skipped from the browser, and repeated wrong guesses lock PIN entry. It's stored only as a salted hash (scrypt), never as the PIN itself. The PIN doesn't encrypt anything: it stops someone using the app on your computer from viewing passwords, but it doesn't protect the `data` folder — the encryption key does that.
 - **Other note types are not encrypted.** Don't put secrets in plain-text, Markdown, code, change log or to-do notes.
 - **There is no login.** The app only accepts connections from your own computer, but anyone who can use your computer account can open it while it's running.
 - **Don't expose it to your network.** Leave the `HOST` setting at its default unless you add your own protection.
@@ -375,8 +389,10 @@ PORT=3001 npm start
 | Change log — change description | `Enter` | Add another change with the same label |
 | To-do list — item | `Enter` | Add a new item below |
 | | `Backspace` (item empty) | Remove the item |
+| PIN dialog | `Enter` | Unlock / confirm |
+| | `Esc` | Cancel |
 
-In all of these places, **Enter** never saves the note by accident — click **Save** when you're done.
+In the note editor, **Enter** in these places never saves the note by accident — click **Save** when you're done.
 
 ---
 
@@ -390,7 +406,9 @@ In all of these places, **Enter** never saves the note by accident — click **S
 | `EADDRINUSE` when starting | Something else is using port 3000 — often another copy of this app that's still running. Close it, or start on another port (see [Settings](#10-settings)). |
 | `npm install` fails while building `better-sqlite3` | Check your Node.js version (`node --version`). The app needs Node.js 10.12 – 18, which have ready-made builds of `better-sqlite3`. Node.js 20 and newer are not supported. |
 | After changing your Node.js version, the app won't start (errors mentioning `better-sqlite3` or `NODE_MODULE_VERSION`) | `better-sqlite3` is built for one Node.js version at a time. Delete the `node_modules` folder and run `npm install` again. |
-| **Reveal**, **Copy** or **Edit** does nothing on a password note | The encryption key doesn't match the one the password was saved with — usually a missing or replaced `secret.key`, or a different `NOTES_SECRET`. Restore the original key. |
+| I forgot my PIN | Stop the app, run `npm run reset-pin` in the project folder, and start the app again. You'll create a new PIN the next time you reveal a password. Your passwords are not affected. |
+| The PIN dialog says *"Too many wrong PINs. Try again in … seconds"* | PIN entry is locked after repeated wrong PINs. Wait for the time shown and try again. Restarting the app also clears the lock. |
+| After entering the correct PIN, the PIN dialog shows *"Internal server error"* | The encryption key doesn't match the one the password was saved with — usually a missing or replaced `secret.key`, or a different `NOTES_SECRET`. Restore the original key. |
 | **Copy** buttons do nothing | The browser blocked clipboard access. Open the app at `http://127.0.0.1:3000` or `http://localhost:3000`, and allow clipboard access if asked. |
 | A code snippet isn't coloured correctly | Set the **Language** field to a standard name such as `javascript`, `python` or `csharp`. |
 | Ticking a to-do item shows *"Couldn't save"* | The app has stopped or lost connection. Check the terminal, restart with `npm start` if needed, and refresh the page. |

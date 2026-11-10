@@ -1,6 +1,6 @@
 const path = require('path');
 const express = require('express');
-const { openStore, ValidationError } = require('./src/db');
+const { openStore, ValidationError, PinError } = require('./src/db');
 
 const store = openStore(process.env.NOTES_DATA_DIR);
 const app = express();
@@ -20,8 +20,14 @@ api.get('/notes', (req, res) => {
 });
 
 api.get('/notes/:id', (req, res) => {
-  const note = store.get(Number(req.params.id), { reveal: req.query.reveal === '1' });
+  const note = store.get(Number(req.params.id));
   note ? res.json(note) : res.status(404).json({ error: 'Note not found' });
+});
+
+// The only way to read a password: requires the PIN.
+api.post('/notes/:id/reveal', (req, res) => {
+  const content = store.revealPassword(Number(req.params.id), (req.body || {}).pin);
+  content == null ? res.status(404).json({ error: 'Note not found' }) : res.json({ content });
 });
 
 api.post('/notes', (req, res) => {
@@ -40,6 +46,14 @@ api.delete('/notes/:id', (req, res) => {
 api.get('/categories', (req, res) => res.json(store.categories()));
 api.get('/tags', (req, res) => res.json(store.tags()));
 
+api.get('/pin', (req, res) => res.json({ set: store.pinIsSet() }));
+// Body: { pin } to set the first PIN, or { pin, currentPin } to change it.
+api.post('/pin', (req, res) => {
+  const body = req.body || {};
+  store.setPin(body.pin, body.currentPin);
+  res.status(204).end();
+});
+
 const stamp = () => new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
 // attachment() sets a type from the file extension, so set the SQL type after it.
 const sendSql = (res, filename, sql) =>
@@ -52,6 +66,10 @@ app.use('/api', api);
 
 app.use((err, req, res, next) => {
   if (err instanceof ValidationError) return res.status(400).json({ error: err.message });
+  if (err instanceof PinError) {
+    if (err.retryAfter) res.set('Retry-After', String(err.retryAfter));
+    return res.status(err.status).json({ error: err.message, pinNotSet: Boolean(err.pinNotSet) });
+  }
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
 });

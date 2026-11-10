@@ -18,7 +18,10 @@ const api = {
     return data;
   },
   list: (f) => api.request('GET', '/api/notes?' + new URLSearchParams(Object.entries(f).filter(([, v]) => v))),
-  get: (id, reveal) => api.request('GET', `/api/notes/${id}${reveal ? '?reveal=1' : ''}`),
+  get: (id) => api.request('GET', `/api/notes/${id}`),
+  reveal: (id, pin) => api.request('POST', `/api/notes/${id}/reveal`, { pin }),
+  pinStatus: () => api.request('GET', '/api/pin'),
+  setPin: (pin, currentPin) => api.request('POST', '/api/pin', { pin, currentPin }),
   create: (n) => api.request('POST', '/api/notes', n),
   update: (id, n) => api.request('PUT', `/api/notes/${id}`, n),
   remove: (id) => api.request('DELETE', `/api/notes/${id}`),
@@ -202,22 +205,143 @@ function renderSecret(note) {
   }
 
   const pw = el('code', { textContent: '••••••••••••' });
+  // Asks for the PIN the first time; null if the user cancels. Kept for this view only.
   let revealed = null;
-  const fetchSecret = async () => (revealed ??= (await api.get(note.id, true)).content);
+  const fetchSecret = async () => (revealed ??= await revealWithPin(note.id));
   const toggle = el('button', { type: 'button', textContent: 'Reveal' });
   toggle.onclick = async () => {
-    const showing = toggle.textContent === 'Hide';
-    pw.textContent = showing ? '••••••••••••' : await fetchSecret();
-    toggle.textContent = showing ? 'Reveal' : 'Hide';
+    if (toggle.textContent === 'Hide') {
+      pw.textContent = '••••••••••••';
+      toggle.textContent = 'Reveal';
+      return;
+    }
+    const secret = await fetchSecret();
+    if (secret == null) return;
+    pw.textContent = secret;
+    toggle.textContent = 'Hide';
   };
   const copy = el('button', { type: 'button', textContent: 'Copy' });
   copy.onclick = async () => {
-    await navigator.clipboard.writeText(await fetchSecret());
+    const secret = await fetchSecret();
+    if (secret == null) return;
+    await navigator.clipboard.writeText(secret);
     copy.textContent = 'Copied!';
     setTimeout(() => (copy.textContent = 'Copy'), 1200);
   };
   row('Password', pw, toggle, copy);
   return wrap;
+}
+
+// ---------- PIN ----------
+
+// Shows the PIN dialog. `fields` picks the inputs: 'current', 'pin', 'confirm'.
+// onSubmit(values) returns the result (dialog closes) or throws (message shown, dialog stays).
+// Resolves to the result, or null if cancelled.
+function pinDialog({ title, text, fields, submitLabel = 'OK', onSubmit }) {
+  const modal = $('#pin-modal');
+  const form = $('form', modal);
+  const error = $('.pin-error', modal);
+  $('.pin-title', modal).textContent = title;
+  $('.pin-text', modal).textContent = text;
+  $('.pin-submit', modal).textContent = submitLabel;
+  $('[name=pin]', form).placeholder = fields.includes('current') ? 'New PIN' : 'PIN';
+  for (const name of ['current', 'pin', 'confirm']) {
+    const input = form.elements[name];
+    input.hidden = !fields.includes(name);
+    input.value = '';
+    input.oninput = () => (input.value = input.value.replace(/\D/g, '')); // digits only
+  }
+  error.textContent = '';
+  const previousFocus = document.activeElement;
+  modal.hidden = false;
+  form.elements[fields[0]].focus();
+
+  return new Promise((resolve) => {
+    const close = (result) => {
+      modal.hidden = true;
+      form.onsubmit = modal.onclick = modal.onkeydown = $('.pin-cancel', modal).onclick = null;
+      if (previousFocus && previousFocus.focus) previousFocus.focus();
+      resolve(result);
+    };
+    $('.pin-cancel', modal).onclick = () => close(null);
+    modal.onclick = (e) => e.target === modal && close(null); // click outside the box
+    modal.onkeydown = (e) => e.key === 'Escape' && close(null);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const values = Object.fromEntries(fields.map((name) => [name, form.elements[name].value]));
+      const submit = $('.pin-submit', modal);
+      submit.disabled = true;
+      error.textContent = '';
+      try {
+        close(await onSubmit(values));
+      } catch (err) {
+        error.textContent = err.message;
+        form.elements[fields.at(-1)].select();
+      } finally {
+        submit.disabled = false;
+      }
+    };
+  });
+}
+
+function checkNewPin({ pin, confirm }) {
+  if (!/^\d{4,8}$/.test(pin)) throw new Error('The PIN must be 4 to 8 digits.');
+  if (pin !== confirm) throw new Error("The two PINs don't match.");
+}
+
+async function createPin() {
+  const done = await pinDialog({
+    title: 'Create a PIN',
+    text: "Choose a 4–8 digit PIN. You'll need it to reveal or copy passwords.",
+    fields: ['pin', 'confirm'],
+    submitLabel: 'Create PIN',
+    onSubmit: async (values) => {
+      checkNewPin(values);
+      await api.setPin(values.pin);
+      return true;
+    },
+  });
+  if (done) updatePinButton(true);
+  return Boolean(done);
+}
+
+async function changePin() {
+  const { set } = await api.pinStatus();
+  if (!set) return createPin();
+  const done = await pinDialog({
+    title: 'Change PIN',
+    text: 'Enter your current PIN, then choose a new 4–8 digit PIN.',
+    fields: ['current', 'pin', 'confirm'],
+    submitLabel: 'Change PIN',
+    onSubmit: async (values) => {
+      checkNewPin(values);
+      await api.setPin(values.pin, values.current);
+      return true;
+    },
+  });
+  if (done) {
+    const btn = $('#change-pin');
+    btn.textContent = 'PIN changed ✓';
+    setTimeout(() => updatePinButton(true), 1500);
+  }
+}
+
+// Asks for the PIN (creating one first if needed) and returns the decrypted password,
+// or null if the user cancels.
+async function revealWithPin(noteId) {
+  const { set } = await api.pinStatus();
+  if (!set && !(await createPin())) return null;
+  return pinDialog({
+    title: 'Enter PIN',
+    text: 'Enter your PIN to reveal or copy this password.',
+    fields: ['pin'],
+    submitLabel: 'Unlock',
+    onSubmit: async ({ pin }) => (await api.reveal(noteId, pin)).content,
+  });
+}
+
+function updatePinButton(isSet) {
+  $('#change-pin').textContent = isSet ? 'Change PIN' : 'Set PIN';
 }
 
 // ---------- change logs ----------
@@ -572,7 +696,9 @@ function createTodoEditor(root, data) {
 // ---------- editor ----------
 
 async function editNote(id) {
-  const note = id ? await api.get(id, true) : { type: state.filters.type || 'text', category: state.filters.category, tags: [] };
+  // Password content isn't loaded (it needs the PIN); a blank password field keeps it.
+  const note = id ? await api.get(id) : { type: state.filters.type || 'text', category: state.filters.category, tags: [] };
+  const keepsPassword = Boolean(id) && note.type === 'password';
   const frag = $('#edit-tpl').content.cloneNode(true);
   const form = $('form', frag);
   const f = form.elements;
@@ -584,7 +710,7 @@ async function editNote(id) {
   const tagPicker = createTagPicker($('.tag-picker', form), note.tags || []);
   f.username.value = note.username || '';
   f.url.value = note.url || '';
-  if (note.type === 'password') f.password.value = note.content || '';
+  if (keepsPassword) f.password.placeholder = 'New password (leave blank to keep the current one)';
   else if (note.type !== 'changelog' && note.type !== 'todo') f.content.value = note.content || '';
   const changelogEditor = createChangelogEditor($('.changelog-editor', form),
     parseChangelog(note.type === 'changelog' ? note.content : ''));
@@ -627,7 +753,8 @@ async function editNote(id) {
       language: f.language.value,
       username: f.username.value,
       url: f.url.value,
-      content: f.type.value === 'password' ? f.password.value
+      // null tells the server to keep the stored password.
+      content: f.type.value === 'password' ? (keepsPassword && !f.password.value ? null : f.password.value)
         : f.type.value === 'changelog' ? JSON.stringify(changelogEditor.value())
         : f.type.value === 'todo' ? JSON.stringify(todoEditor.value())
         : f.content.value,
@@ -835,6 +962,8 @@ applyTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'
 
 document.querySelectorAll('#type-filter li').forEach((li) => (li.onclick = () => setFilter('type', li.dataset.value)));
 $('#new-note').onclick = () => editNote(null);
+$('#change-pin').onclick = changePin;
+api.pinStatus().then(({ set }) => updatePinButton(set)).catch(() => {});
 let searchTimer;
 $('#search').oninput = (e) => {
   clearTimeout(searchTimer);

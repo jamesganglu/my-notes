@@ -206,14 +206,13 @@ async function editNote(id) {
 
   f.title.value = note.title || '';
   f.type.value = note.type;
-  f.category.value = note.category || '';
+  const categoryPicker = createCategoryPicker($('.cat-picker', form), note.category || '');
   f.language.value = note.language || '';
   const tagPicker = createTagPicker($('.tag-picker', form), note.tags || []);
   f.username.value = note.username || '';
   f.url.value = note.url || '';
   if (note.type === 'password') f.password.value = note.content || '';
   else f.content.value = note.content || '';
-  $('#category-options', form).replaceChildren(...(state.categories || []).map((c) => el('option', { value: c })));
 
   const preview = $('.md-preview', form);
   const syncType = () => {
@@ -247,7 +246,7 @@ async function editNote(id) {
     const payload = {
       title: f.title.value,
       type: f.type.value,
-      category: f.category.value,
+      category: categoryPicker.value(),
       tags: tagPicker.values(),
       language: f.language.value,
       username: f.username.value,
@@ -266,6 +265,64 @@ async function editNote(id) {
 
   $('#detail').replaceChildren(frag);
   f.title.focus();
+}
+
+// Single-choice dropdown of existing categories, with an option to add a new one.
+function createCategoryPicker(root, initial) {
+  const select = $('select', root);
+  const box = $('.cat-new', root);
+  const input = $('.cat-input', root);
+  const categories = new Set(state.categories || []);
+  if (initial) categories.add(initial);
+  let current = initial;
+  // Identified by reference, so no option value is reserved and any category name is allowed.
+  const newOption = el('option', { textContent: '+ New category…' });
+
+  function render() {
+    const sorted = [...categories].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    select.replaceChildren(
+      el('option', { value: '', textContent: 'No category' }),
+      ...sorted.map((c) => el('option', { value: c, textContent: c })),
+      newOption,
+    );
+    select.value = current;
+  }
+
+  const closeBox = () => {
+    box.hidden = true;
+    input.value = '';
+    select.value = current;
+  };
+
+  const add = () => {
+    const name = input.value.trim();
+    if (!name) return input.focus();
+    // Reuse an existing category if only the letter case differs.
+    current = [...categories].find((c) => c.toLowerCase() === name.toLowerCase()) ?? name;
+    categories.add(current);
+    render();
+    closeBox();
+  };
+
+  select.onchange = () => {
+    if (select.selectedOptions[0] === newOption) {
+      box.hidden = false;
+      input.focus();
+    } else {
+      current = select.value;
+      closeBox();
+    }
+  };
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); add(); }
+    if (e.key === 'Escape') { e.preventDefault(); closeBox(); }
+  };
+  $('.cat-add', root).onclick = add;
+  $('.cat-cancel', root).onclick = closeBox;
+
+  render();
+  // If the user typed a name but didn't click Add, save it anyway.
+  return { value: () => (!box.hidden && input.value.trim() ? (add(), current) : current) };
 }
 
 // List box of existing tags (click to toggle) plus an input that filters the list or adds new tags.

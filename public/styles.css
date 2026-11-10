@@ -85,6 +85,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .editor .row { display: flex; gap: 10px; }
 .editor .row > * { flex: 1; }
 .editor textarea { min-height: 340px; resize: vertical; font-family: ui-monospace, Consolas, monospace; }
+.cat-picker { display: flex; flex-direction: column; gap: 6px; }
+.cat-new { display: flex; gap: 6px; }
+.cat-new[hidden] { display: none; }
+.cat-new input { flex: 1; min-width: 0; }
 .tag-picker { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
 .tp-selected { display: flex; flex-wrap: wrap; gap: 5px; }
 .tp-selected:empty::before { content: "No tags selected"; color: var(--muted); font-size: 12px; }

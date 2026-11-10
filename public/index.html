@@ -66,8 +66,14 @@
           <option value="code">Code snippet</option>
           <option value="password">Password</option>
         </select>
-        <input name="category" placeholder="Category" list="category-options" />
-        <datalist id="category-options"></datalist>
+        <div class="cat-picker">
+          <select name="category" aria-label="Category"></select>
+          <div class="cat-new" hidden>
+            <input class="cat-input" placeholder="New category name" autocomplete="off" />
+            <button type="button" class="cat-add">Add</button>
+            <button type="button" class="cat-cancel">Cancel</button>
+          </div>
+        </div>
         <input name="language" class="only-code" placeholder="Language (e.g. js, python)" />
       </div>
       <div class="tag-picker">

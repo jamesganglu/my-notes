@@ -1,40 +1,76 @@
 # Note Taker — User Manual
 
-Note Taker is a personal notes app that runs on your own computer and opens in your web browser. It keeps six kinds of notes — plain text, Markdown, code snippets, passwords, change logs and to-do lists — and lets you organise them with categories and tags.
+Note Taker is a personal notes app that runs on your own computer and opens in your web browser. It keeps six kinds of notes and lets you organise them with categories and tags:
+
+| Type | Use it for |
+| --- | --- |
+| **Plain text** | Quick notes, shown exactly as typed. |
+| **Markdown** | Formatted notes with headings, lists, links, tables and code blocks. |
+| **Code snippet** | Code with syntax highlighting and a copy button. |
+| **Password** | Logins, with the password encrypted and hidden until you reveal it. |
+| **Change log** | A project's version history, in the standard *Keep a Changelog* format. |
+| **To-do list** | Checklists with due dates that you tick off as you go. |
+
+You can also search all your notes, print any note or save it as a PDF, switch between a white and a dark theme, and export everything to PostgreSQL.
 
 ## Contents
 
-1. [Installing and starting](#1-installing-and-starting)
+1. [Installing, starting and updating](#1-installing-starting-and-updating)
 2. [The screen at a glance](#2-the-screen-at-a-glance)
 3. [Creating a note](#3-creating-a-note)
 4. [Note types](#4-note-types)
 5. [Categories and tags](#5-categories-and-tags)
 6. [Finding notes](#6-finding-notes)
-7. [Editing and deleting](#7-editing-and-deleting)
+7. [Editing, deleting and printing](#7-editing-deleting-and-printing)
 8. [Your data and backups](#8-your-data-and-backups)
 9. [Security notes](#9-security-notes)
 10. [Settings](#10-settings)
-11. [Troubleshooting](#11-troubleshooting)
+11. [Keyboard shortcuts](#11-keyboard-shortcuts)
+12. [Troubleshooting](#12-troubleshooting)
 
 ---
 
-## 1. Installing and starting
+## 1. Installing, starting and updating
 
-You need [Node.js](https://nodejs.org) version 20 or newer.
+You need [Git](https://git-scm.com) to download the app, and [Node.js](https://nodejs.org) **version 10.12 to 18** — check yours with `node --version`. Node.js 20 and newer are not supported.
 
-**First time only** — open a terminal in the project folder and install the dependencies:
+### Installing (first time only)
+
+Open a terminal and run:
 
 ```sh
+git clone https://github.com/jamesganglu/my-notes.git
+cd my-notes
 npm install
 ```
 
-**Every time you want to use it:**
+During `npm install` you may see warnings that `marked` and `@highlightjs/cdn-assets` are *"not compatible with your version of node"*. These can be ignored: those two packages are only sent to your browser and never run in Node.js.
+
+### Starting
+
+In the project folder, run:
 
 ```sh
 npm start
 ```
 
 Then open **http://127.0.0.1:3000** in your browser. Leave the terminal window open while you use the app; closing it (or pressing `Ctrl+C`) stops the app. Your notes are saved as you go, so stopping the app never loses anything.
+
+### Updating
+
+1. Stop the app (`Ctrl+C` in its terminal).
+2. In the project folder, run:
+
+   ```sh
+   git pull
+   npm install
+   ```
+
+3. Start the app again with `npm start`, and refresh the page in your browser.
+
+Always restart the app after updating. Refreshing the browser alone isn't enough, because the server part of the app only loads new code when it starts.
+
+If an update adds a new note type, the app upgrades your database automatically the first time it starts. The terminal shows *"Upgrading notes table for new note types"*, and a backup copy of your database is saved first (see [Your data and backups](#8-your-data-and-backups)). All your notes, tags and categories are kept.
 
 ---
 
@@ -44,13 +80,13 @@ The window has three columns:
 
 | Column | What it holds |
 | --- | --- |
-| **Sidebar** (left) | The **+ New note** button, the search box, filters for **Type**, **Categories** and **Tags**, the **Export** buttons, and the **Theme** buttons. |
-| **Note list** (middle) | The notes that match your current search and filters, newest-edited first. Each entry shows its type badge, title, category and a preview of the content. When a filter is active, a summary line at the top shows how many notes match. |
+| **Sidebar** (left) | From top to bottom: the **+ New note** button, the search box, filters for **Type**, **Categories** and **Tags**, the **Export** buttons, and the **Theme** buttons. |
+| **Note list** (middle) | The notes that match your current search or filters, most recently edited first. Each entry shows its type badge, title, category and a short summary — a preview of the text, the username for passwords, the latest version for change logs, or progress for to-do lists. While you're searching or filtering, a line at the top shows how many notes match. |
 | **Detail pane** (right) | The selected note, or the editor when you are creating or changing a note. |
 
 On a narrow window (such as a phone) the columns stack on top of each other.
 
-### Light and dark theme
+### White and dark theme
 
 At the bottom of the sidebar, under **Theme**, click **White** for a light theme or **Dark** for a dark theme. The highlighted button shows the current theme. Your choice is remembered in this browser, so the app opens in the same theme next time. The app starts in the dark theme until you choose. Printing always uses black on white, whichever theme you pick.
 
@@ -65,9 +101,9 @@ At the bottom of the sidebar, under **Theme**, click **White** for a light theme
 5. Optionally choose **tags** (see [Categories and tags](#5-categories-and-tags)).
 6. Fill in the content and click **Save**. Click **Cancel** to discard.
 
-> **Tip:** If a type or category filter is active when you click **+ New note**, the new note starts with that type and category already filled in.
+> **Tip:** If a type or category filter is selected when you click **+ New note**, the new note starts with that type and category already filled in.
 
-In the content box, pressing **Tab** inserts two spaces instead of moving to the next field, which is handy for indenting code.
+In the text box of a plain-text, Markdown or code note, pressing **Tab** inserts two spaces instead of moving to the next field, which is handy for indenting code.
 
 ---
 
@@ -87,7 +123,7 @@ Enter the code and, optionally, the **Language** (for example `javascript`, `pyt
 
 ### Password
 
-A password note has these fields instead of a content box:
+A password note has these fields instead of a text box:
 
 | Field | Notes |
 | --- | --- |
@@ -115,14 +151,14 @@ The labels are **Added** (new features), **Changed** (changes to existing featur
 
 **In the editor:**
 
-- Click **+ Add version** to add a new version at the top. The version number is suggested from the previous one — after `1.0.0` it suggests `1.0.1` — and you can change it.
+- Click **+ Add version** to add a new version at the top. The version number is suggested from the version above it — after `1.0.0` it suggests `1.0.1` — and you can change it.
 - Choose a label from the dropdown and type the description. Press **Enter** to start another change with the same label, or click **+ Add change**.
 - Click **×** to remove a change, or **Remove version** to remove a version with all its changes (you'll be asked to confirm if it has any).
 - Empty change rows are ignored when you save.
 
-**When viewing**, versions are shown newest first as a timeline, with each version's changes grouped under their labels. Click **Copy as Markdown** to copy the whole change log in Keep a Changelog format, ready to paste into a project's `CHANGELOG.md`.
+**When viewing**, versions are shown as a timeline in the order they appear in the editor — newest at the top, since new versions are added there. Each version's changes are grouped under their labels. Click **Copy as Markdown** to copy the whole change log in Keep a Changelog format, ready to paste into a project's `CHANGELOG.md`.
 
-The note list shows the latest version, its date and how many changes it has.
+The note list shows the top version, its date and how many changes it has.
 
 ### To-do list
 
@@ -136,10 +172,10 @@ A checklist of items. Each item has a description, a **done** checkbox, and an o
 - Paste several lines at once to create one item per line. Markdown checklists work too — `- [x] Bread` becomes a ticked item called *Bread*.
 - Empty items are ignored when you save.
 
-**When viewing**, you can tick items off directly — no need to click **Edit**. Each tick is saved straight away. The view also shows:
+**When viewing**, you can tick items off directly — no need to click **Edit**. Each tick is saved straight away, and like any change it moves the note to the top of the note list. The view also shows:
 
 - A progress bar and a count, e.g. *3 of 5 done*.
-- Due dates — **Due today** in yellow, and **Overdue** in red for unfinished items past their due date.
+- Due dates — unfinished items due today are highlighted as **Due today**, and unfinished items past their due date are shown in red as **Overdue**.
 - **Hide completed** to show only what's left (click **Show completed** to bring them back). The app remembers this choice in your browser.
 - **Copy as Markdown** to copy the list as a Markdown checklist.
 
@@ -168,14 +204,7 @@ The tag picker in the editor has three parts:
 - **List box** — every tag you have used before, with the number of notes that use it. Click a tag to tick or untick it.
 - **Filter / add box** — type to narrow the list. To add a new tag, type it and press **Enter**, type a comma, or click **Add tag**. If nothing in the list matches, the list also offers **Create tag "…"**. You can add several at once by typing them separated by commas, e.g. `work, ideas`.
 
-Keyboard shortcuts in the filter box:
-
-| Key | Action |
-| --- | --- |
-| `↑` / `↓` | Move through the list |
-| `Enter` | Tick/untick the highlighted tag, or add what you typed |
-| `,` | Add what you typed |
-| `Backspace` (box empty) | Remove the last selected tag |
+See [Keyboard shortcuts](#11-keyboard-shortcuts) for the keys that work in the filter box.
 
 ### Good to know
 
@@ -193,9 +222,17 @@ Type in the **Search** box in the sidebar. Results update as you type, and the l
 
 **Search always looks through all of your notes**, whatever type, category or tag filter is selected. While you're searching, the selected filters are greyed out to show they're paused. Clear the search box (or press **Esc**) to go back to your filtered view. Clicking a filter while searching clears the search and shows that filter instead.
 
-Search looks in each note's title, content, category, tags, and — for password notes — the username and URL. For change logs it searches the versions, dates and change descriptions; for to-do lists, the item descriptions and due dates. Search ignores capitalisation for unaccented letters (A–Z; accented letters such as `É` must match exactly), and characters such as `%` and `_` are matched literally.
+What gets searched:
 
-The password itself is never searched, because it is encrypted.
+| Note type | Searched fields |
+| --- | --- |
+| Every note | Title, category and tags |
+| Plain text, Markdown, Code | The text |
+| Password | Username and URL — **never the password itself**, because it is encrypted |
+| Change log | Versions, dates and change descriptions |
+| To-do list | Item descriptions and due dates |
+
+Search ignores capitalisation for unaccented letters (A–Z; accented letters such as `É` must match exactly), and characters such as `%` and `_` are matched literally.
 
 ### Filters
 
@@ -207,27 +244,36 @@ Filters combine with each other. For example, choosing **Code** and the category
 
 ---
 
-## 7. Editing and deleting
+## 7. Editing, deleting and printing
 
-Open a note, then:
+Open a note, then use the buttons at the top right:
 
-- Click **Edit** to change it, then **Save**. The note moves to the top of the list because the list is sorted by last edit.
-- Click **Delete** and confirm. **Deleting can't be undone.**
-- Click **Print** to print the note, or choose **Save as PDF** in the print dialog to make a PDF. Only the note is printed — the sidebar, list and buttons are left out — in black on white, and the note title is used as the page heading and suggested file name. For password notes, the password prints masked unless you click **Reveal** before printing. To-do lists always print every item, even if completed items are hidden.
+- **Print** — prints the note, or choose **Save as PDF** in the print dialog to make a PDF (see [Printing](#printing)).
+- **Edit** — change the note, then click **Save**. The note moves to the top of the list because the list is sorted by last edit.
+- **Delete** — removes the note after you confirm. **Deleting can't be undone.**
+
+### Printing
+
+Only the note itself is printed — the sidebar, note list and buttons are left out — in black on white, whichever theme you use. The note title is used as the page heading and as the suggested file name when saving a PDF.
+
+- Code is printed in black with comments in grey, and long lines wrap instead of being cut off.
+- Web links in Markdown notes are printed with their address after them.
+- Password notes print with the password masked, unless you click **Reveal** before printing.
+- To-do lists always print every item, even if completed items are hidden.
 
 ### Changing a note's type
 
-You can change the type of an existing note in the editor. Be aware that:
+You can change the type of an existing note in the editor, but some content doesn't carry over. Copy anything you need first.
 
-- Changing a **password** note to another type replaces the password with whatever is in the content box (empty by default), and its username and URL are removed. Copy anything you need first.
+- Changing **to or from a password** note replaces the content: a password becomes whatever is in the text box (empty by default), and text becomes whatever is in the password field (empty by default). Changing away from a password also removes the username and URL.
 - Changing a **code** note to another type removes its language setting.
-- Changing a **change log** or **to-do list** to another type removes all of its versions or items, and changing another type to one of these removes the existing text. Copy anything you need first.
+- Changing a **change log** or **to-do list** to another type removes all of its versions or items, and changing another type to one of these removes the existing text.
 
 ---
 
 ## 8. Your data and backups
 
-Everything is stored in the `data` folder inside the project:
+Everything is stored in the `data` folder inside the project (or the folder set by `NOTES_DATA_DIR` — see [Settings](#10-settings)):
 
 | File | Purpose |
 | --- | --- |
@@ -249,12 +295,12 @@ The `data` folder is excluded from Git, so your notes are never uploaded to GitH
 
 ### Exporting to PostgreSQL
 
-The **Export** section at the bottom of the sidebar has two buttons, each of which downloads a `.sql` file:
+The **Export** section in the sidebar has two buttons, each of which downloads a `.sql` file:
 
 | Button | File | What it contains |
 | --- | --- | --- |
 | **Postgres schema** | `notes-schema.postgres.sql` | The table definitions only (`CREATE TABLE` and indexes), for setting up an empty PostgreSQL database with the same structure. |
-| **Postgres dump** | `notes-dump-<date>-<time>.postgres.sql` | The table definitions **plus all your notes, tags and tag links**, ready to restore into an empty PostgreSQL database. |
+| **Postgres dump** | `notes-dump-<date>-<time>.postgres.sql` (time in UTC) | The table definitions **plus all your notes, tags and tag links**, ready to restore into an empty PostgreSQL database. |
 
 To load either file, create an empty database and run the file against it, for example:
 
@@ -279,10 +325,11 @@ Things to know:
 ## 9. Security notes
 
 - **Passwords are encrypted** (AES-256-GCM). Someone who gets hold of `notes.db` alone can't read them. Someone who gets the whole `data` folder, including `secret.key`, can — so protect that folder and your backups. To keep the key out of the folder entirely, use `NOTES_SECRET` (see [Settings](#10-settings)).
-- **Other note types are not encrypted.** Don't put secrets in plain-text, Markdown or code notes.
+- **Other note types are not encrypted.** Don't put secrets in plain-text, Markdown, code, change log or to-do notes.
 - **There is no login.** The app only accepts connections from your own computer, but anyone who can use your computer account can open it while it's running.
 - **Don't expose it to your network.** Leave the `HOST` setting at its default unless you add your own protection.
 - **Copied passwords stay on the clipboard** until you copy something else.
+- **Exports and backups contain your notes.** Treat `.sql` export files and copies of the `data` folder as carefully as the app itself.
 
 ---
 
@@ -294,7 +341,7 @@ Settings are environment variables set before starting the app. All are optional
 | --- | --- | --- |
 | `PORT` | `3000` | The port in the address, e.g. `3001` gives `http://127.0.0.1:3001`. |
 | `HOST` | `127.0.0.1` | Which network address to listen on. Keep the default (see [Security notes](#9-security-notes)). |
-| `NOTES_DATA_DIR` | `./data` | Folder for the database and key file. |
+| `NOTES_DATA_DIR` | the project's `data` folder | Folder for the database, backups and key file. |
 | `NOTES_SECRET` | *(not set)* | A passphrase used as the encryption key instead of `secret.key`. |
 
 Examples:
@@ -313,13 +360,37 @@ PORT=3001 npm start
 
 ---
 
-## 11. Troubleshooting
+## 11. Keyboard shortcuts
+
+| Where | Key | Action |
+| --- | --- | --- |
+| Search box | `Esc` | Clear the search and return to your filtered view |
+| Text box (plain text, Markdown, code) | `Tab` | Insert two spaces |
+| Category — new category box | `Enter` | Add the category |
+| | `Esc` | Cancel |
+| Tag picker — filter box | `↑` / `↓` | Move through the tag list |
+| | `Enter` | Tick/untick the highlighted tag, or add what you typed |
+| | `,` | Add what you typed |
+| | `Backspace` (box empty) | Remove the last selected tag |
+| Change log — change description | `Enter` | Add another change with the same label |
+| To-do list — item | `Enter` | Add a new item below |
+| | `Backspace` (item empty) | Remove the item |
+
+In all of these places, **Enter** never saves the note by accident — click **Save** when you're done.
+
+---
+
+## 12. Troubleshooting
 
 | Problem | Solution |
 | --- | --- |
 | The browser says it can't connect | The app isn't running. Run `npm start` and keep the terminal open. |
-| `EADDRINUSE` when starting | Something else is using port 3000 — often another copy of this app. Close it, or start on another port (see [Settings](#10-settings)). |
-| `npm install` fails while building `better-sqlite3` | Check you have Node.js 20 or newer (`node --version`). The project uses a version of `better-sqlite3` with ready-made builds for Node 20. |
+| After updating, new buttons or note types are missing, or a page shows *"Cannot GET …"* | The app is still running the old version. Stop it with `Ctrl+C`, run `npm start`, and refresh the browser. |
+| The terminal shows *"Upgrading notes table for new note types"* | Nothing is wrong — this is the automatic one-time database upgrade after an update. A backup is saved in the `data` folder first. |
+| `EADDRINUSE` when starting | Something else is using port 3000 — often another copy of this app that's still running. Close it, or start on another port (see [Settings](#10-settings)). |
+| `npm install` fails while building `better-sqlite3` | Check your Node.js version (`node --version`). The app needs Node.js 10.12 – 18, which have ready-made builds of `better-sqlite3`. Node.js 20 and newer are not supported. |
+| After changing your Node.js version, the app won't start (errors mentioning `better-sqlite3` or `NODE_MODULE_VERSION`) | `better-sqlite3` is built for one Node.js version at a time. Delete the `node_modules` folder and run `npm install` again. |
 | **Reveal**, **Copy** or **Edit** does nothing on a password note | The encryption key doesn't match the one the password was saved with — usually a missing or replaced `secret.key`, or a different `NOTES_SECRET`. Restore the original key. |
 | **Copy** buttons do nothing | The browser blocked clipboard access. Open the app at `http://127.0.0.1:3000` or `http://localhost:3000`, and allow clipboard access if asked. |
 | A code snippet isn't coloured correctly | Set the **Language** field to a standard name such as `javascript`, `python` or `csharp`. |
+| Ticking a to-do item shows *"Couldn't save"* | The app has stopped or lost connection. Check the terminal, restart with `npm start` if needed, and refresh the page. |

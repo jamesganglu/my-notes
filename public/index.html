@@ -19,6 +19,8 @@
       <li data-value="markdown">Markdown</li>
       <li data-value="code">Code</li>
       <li data-value="password">Passwords</li>
+      <li data-value="changelog">Change logs</li>
+      <li data-value="todo">To-do lists</li>
     </ul>
 
     <h3>Categories</h3>
@@ -26,6 +28,14 @@
 
     <h3>Tags</h3>
     <div id="tag-filter" class="tag-cloud"></div>
+
+    <h3>Export</h3>
+    <div class="export">
+      <a class="button" href="/api/export/postgres/schema" download
+         title="CREATE TABLE statements for an empty PostgreSQL database">Postgres schema</a>
+      <a class="button" href="/api/export/postgres/dump" download
+         title="Schema plus all notes, tags and links as PostgreSQL INSERT statements">Postgres dump</a>
+    </div>
   </aside>
 
   <section class="list">
@@ -49,6 +59,7 @@
         <div class="v-tags tags"></div>
       </div>
       <div class="actions">
+        <button class="v-print">Print</button>
         <button class="v-edit">Edit</button>
         <button class="v-delete danger">Delete</button>
       </div>
@@ -65,6 +76,8 @@
           <option value="markdown">Markdown</option>
           <option value="code">Code snippet</option>
           <option value="password">Password</option>
+          <option value="changelog">Change log</option>
+          <option value="todo">To-do list</option>
         </select>
         <div class="cat-picker">
           <select name="category" aria-label="Category"></select>
@@ -93,7 +106,9 @@
         <button type="button" class="pw-toggle">Show</button>
         <button type="button" class="pw-generate">Generate</button>
       </div>
-      <textarea name="content" class="not-password" placeholder="Write your note…" spellcheck="false"></textarea>
+      <textarea name="content" class="content-field" placeholder="Write your note…" spellcheck="false"></textarea>
+      <div class="changelog-editor only-changelog"></div>
+      <div class="todo-editor only-todo"></div>
       <div class="md-preview only-markdown"></div>
       <div class="actions">
         <button type="submit" class="primary">Save</button>

@@ -1,6 +1,6 @@
 # Note Taker — User Manual
 
-Note Taker is a personal notes app that runs on your own computer and opens in your web browser. It keeps four kinds of notes — plain text, Markdown, code snippets and passwords — and lets you organise them with categories and tags.
+Note Taker is a personal notes app that runs on your own computer and opens in your web browser. It keeps six kinds of notes — plain text, Markdown, code snippets, passwords, change logs and to-do lists — and lets you organise them with categories and tags.
 
 ## Contents
 
@@ -56,7 +56,7 @@ On a narrow window (such as a phone) the columns stack on top of each other.
 
 1. Click **+ New note**.
 2. Enter a **Title** — this is the only required field.
-3. Choose the note **type**: Plain text, Markdown, Code snippet or Password. The form changes to show the fields for that type.
+3. Choose the note **type**: Plain text, Markdown, Code snippet, Password, Change log or To-do list. The form changes to show the fields for that type.
 4. Optionally choose a **Category** from the dropdown, or pick **+ New category…** to add one (see [Categories and tags](#5-categories-and-tags)).
 5. Optionally choose **tags** (see [Categories and tags](#5-categories-and-tags)).
 6. Fill in the content and click **Save**. Click **Cancel** to discard.
@@ -94,6 +94,52 @@ A password note has these fields instead of a content box:
 When viewing a password note, the password is masked (`••••••••`). Click **Reveal** to show it, **Hide** to mask it again, or **Copy** to copy it to the clipboard without displaying it. The username also has a **Copy** button.
 
 Passwords are stored **encrypted** in the database. See [Security notes](#9-security-notes).
+
+### Change log
+
+A change log records the versions of a project and what changed in each one, following the [Keep a Changelog](https://keepachangelog.com) format. Use one change log note per project.
+
+Each version has:
+
+| Field | Notes |
+| --- | --- |
+| **Version** | e.g. `1.2.0`. Leave blank for changes that aren't released yet — shown as **Unreleased**. |
+| **Date** | Filled in with today's date when you add a version; change it with the date picker. |
+| **Changes** | A list of changes, each with a label and a description. |
+
+The labels are **Added** (new features), **Changed** (changes to existing features), **Deprecated** (features that will be removed), **Removed**, **Fixed** (bug fixes) and **Security** (vulnerability fixes).
+
+**In the editor:**
+
+- Click **+ Add version** to add a new version at the top. The version number is suggested from the previous one — after `1.0.0` it suggests `1.0.1` — and you can change it.
+- Choose a label from the dropdown and type the description. Press **Enter** to start another change with the same label, or click **+ Add change**.
+- Click **×** to remove a change, or **Remove version** to remove a version with all its changes (you'll be asked to confirm if it has any).
+- Empty change rows are ignored when you save.
+
+**When viewing**, versions are shown newest first as a timeline, with each version's changes grouped under their labels. Click **Copy as Markdown** to copy the whole change log in Keep a Changelog format, ready to paste into a project's `CHANGELOG.md`.
+
+The note list shows the latest version, its date and how many changes it has.
+
+### To-do list
+
+A checklist of items. Each item has a description, a **done** checkbox, and an optional **due date**.
+
+**In the editor:**
+
+- Type an item and press **Enter** to start the next one, or click **+ Add item**.
+- Press **Backspace** in an empty item to remove it, or click **×** on any item.
+- Pick a due date with the date picker if the item has a deadline.
+- Paste several lines at once to create one item per line. Markdown checklists work too — `- [x] Bread` becomes a ticked item called *Bread*.
+- Empty items are ignored when you save.
+
+**When viewing**, you can tick items off directly — no need to click **Edit**. Each tick is saved straight away. The view also shows:
+
+- A progress bar and a count, e.g. *3 of 5 done*.
+- Due dates — **Due today** in yellow, and **Overdue** in red for unfinished items past their due date.
+- **Hide completed** to show only what's left (click **Show completed** to bring them back). The app remembers this choice in your browser.
+- **Copy as Markdown** to copy the list as a Markdown checklist.
+
+The note list shows how many items are done and how many are overdue.
 
 ---
 
@@ -139,13 +185,13 @@ Keyboard shortcuts in the filter box:
 
 ### Search
 
-Type in the **Search** box in the sidebar. Results update as you type. Search looks in each note's title, content, category, tags, and — for password notes — the username and URL.
+Type in the **Search** box in the sidebar. Results update as you type. Search looks in each note's title, content, category, tags, and — for password notes — the username and URL. For change logs it searches the versions, dates and change descriptions; for to-do lists, the item descriptions and due dates.
 
 The password itself is never searched, because it is encrypted.
 
 ### Filters
 
-- **Type** — click *Plain text*, *Markdown*, *Code* or *Passwords*, or *All* to clear.
+- **Type** — click *Plain text*, *Markdown*, *Code*, *Passwords*, *Change logs* or *To-do lists*, or *All* to clear.
 - **Categories** — click a category to show only its notes, or *All* to clear. The number beside each is how many notes it has.
 - **Tags** — click a tag to show only notes with that tag; click it again to clear. You can also click any tag shown on an open note.
 
@@ -159,6 +205,7 @@ Open a note, then:
 
 - Click **Edit** to change it, then **Save**. The note moves to the top of the list because the list is sorted by last edit.
 - Click **Delete** and confirm. **Deleting can't be undone.**
+- Click **Print** to print the note, or choose **Save as PDF** in the print dialog to make a PDF. Only the note is printed — the sidebar, list and buttons are left out — in black on white, and the note title is used as the page heading and suggested file name. For password notes, the password prints masked unless you click **Reveal** before printing. To-do lists always print every item, even if completed items are hidden.
 
 ### Changing a note's type
 
@@ -166,6 +213,7 @@ You can change the type of an existing note in the editor. Be aware that:
 
 - Changing a **password** note to another type replaces the password with whatever is in the content box (empty by default), and its username and URL are removed. Copy anything you need first.
 - Changing a **code** note to another type removes its language setting.
+- Changing a **change log** or **to-do list** to another type removes all of its versions or items, and changing another type to one of these removes the existing text. Copy anything you need first.
 
 ---
 
@@ -177,6 +225,7 @@ Everything is stored in the `data` folder inside the project:
 | --- | --- |
 | `notes.db` | The SQLite database holding all your notes. |
 | `notes.db-wal`, `notes.db-shm` | Temporary database files that exist while the app is running. |
+| `notes.backup-<number>.db` | A backup made automatically when an app update changes the database layout. You can delete these once you're happy everything works. |
 | `secret.key` | The key used to encrypt your passwords. Created automatically the first time the app runs. |
 
 ### Backing up
@@ -189,6 +238,33 @@ To restore, stop the app, put the copied `data` folder back, and start the app.
 > **Important:** `notes.db` and `secret.key` belong together. Without the matching `secret.key`, saved passwords **can't be recovered** — the rest of your notes will still be readable.
 
 The `data` folder is excluded from Git, so your notes are never uploaded to GitHub.
+
+### Exporting to PostgreSQL
+
+The **Export** section at the bottom of the sidebar has two buttons, each of which downloads a `.sql` file:
+
+| Button | File | What it contains |
+| --- | --- | --- |
+| **Postgres schema** | `notes-schema.postgres.sql` | The table definitions only (`CREATE TABLE` and indexes), for setting up an empty PostgreSQL database with the same structure. |
+| **Postgres dump** | `notes-dump-<date>-<time>.postgres.sql` | The table definitions **plus all your notes, tags and tag links**, ready to restore into an empty PostgreSQL database. |
+
+To load either file, create an empty database and run the file against it, for example:
+
+```sh
+createdb notes
+psql -d notes -f notes-dump-20261110-182053.postgres.sql
+```
+
+You can also open the file in a tool such as pgAdmin or DBeaver and run it there. The dump runs as a single transaction, so if anything goes wrong nothing is half-loaded.
+
+Things to know:
+
+- **Run it on an empty database.** The files create the tables, so they fail if tables called `notes`, `tags` or `note_tags` already exist.
+- **Note IDs are kept**, and new notes added in PostgreSQL carry on numbering from where the app left off.
+- **Dates and times** are converted to PostgreSQL `timestamptz` values in UTC.
+- **Tag names stay unique regardless of capitalisation**, as in the app.
+- **Change log and to-do list content is JSON** stored in a text column. In PostgreSQL you can query it with `content::jsonb`.
+- **Passwords stay encrypted** in the dump, exactly as stored in the app. They can only be decrypted with your `secret.key` (or `NOTES_SECRET`), so a dump file doesn't expose your passwords on its own. Everything else in the dump is readable text — store it as carefully as your notes.
 
 ---
 

@@ -2,29 +2,69 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const { loadKey, createCipher } = require('./crypto');
+const { postgresSchema, postgresDump } = require('./postgres');
 
-const NOTE_TYPES = ['text', 'code', 'password', 'markdown'];
+const NOTE_TYPES = ['text', 'code', 'password', 'markdown', 'changelog', 'todo'];
+// Keep a Changelog sections, in display order.
+const CHANGE_KINDS = ['added', 'changed', 'deprecated', 'removed', 'fixed', 'security'];
+
+const typeList = NOTE_TYPES.map((t) => `'${t}'`).join(',');
+const notesTableSql = (name) => `
+  CREATE TABLE ${name} (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    title      TEXT NOT NULL,
+    type       TEXT NOT NULL CHECK (type IN (${typeList})),
+    content    TEXT NOT NULL DEFAULT '',  -- JSON for changelog and todo notes
+    category   TEXT NOT NULL DEFAULT '',
+    language   TEXT,            -- code notes
+    username   TEXT,            -- password notes
+    url        TEXT,            -- password notes
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`;
+
+// SQLite can't alter a CHECK constraint, so when NOTE_TYPES changes the notes table
+// is rebuilt (https://www.sqlite.org/lang_altertable.html#otheralter). A backup is
+// written next to the database first.
+function migrateNoteTypes(db, dbFile) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notes'").get();
+  if (!row) return;
+  const current = /CHECK\s*\(\s*type\s+IN\s*\(([^)]*)\)\s*\)/i.exec(row.sql)?.[1].replace(/\s/g, '');
+  if (current === typeList) return;
+
+  const backup = dbFile.replace(/\.db$/, '') + `.backup-${Date.now()}.db`;
+  db.prepare('VACUUM INTO ?').run(backup);
+  console.log(`Upgrading notes table for new note types (backup saved to ${backup})`);
+
+  db.pragma('foreign_keys = OFF'); // otherwise dropping notes would cascade-delete note_tags
+  try {
+    db.transaction(() => {
+      // Preserve the AUTOINCREMENT high-water mark so ids of deleted notes aren't reused.
+      const seq = db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'notes'").pluck().get();
+      db.exec(`${notesTableSql('notes_new')};
+        INSERT INTO notes_new (id, title, type, content, category, language, username, url, created_at, updated_at)
+          SELECT id, title, type, content, category, language, username, url, created_at, updated_at FROM notes;
+        DROP TABLE notes;
+        ALTER TABLE notes_new RENAME TO notes;`);
+      if (seq != null) db.prepare("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'notes'").run(seq);
+      if (db.pragma('foreign_key_check').length) throw new Error('Foreign key check failed after migration');
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
 
 function openStore(dataDir = path.join(__dirname, '..', 'data')) {
   fs.mkdirSync(dataDir, { recursive: true });
-  const db = new Database(path.join(dataDir, 'notes.db'));
+  const dbFile = path.join(dataDir, 'notes.db');
+  const db = new Database(dbFile);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   const cipher = createCipher(loadKey(dataDir));
 
+  migrateNoteTypes(db, dbFile);
   db.exec(`
-    CREATE TABLE IF NOT EXISTS notes (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      title      TEXT NOT NULL,
-      type       TEXT NOT NULL CHECK (type IN ('text','code','password','markdown')),
-      content    TEXT NOT NULL DEFAULT '',
-      category   TEXT NOT NULL DEFAULT '',
-      language   TEXT,            -- code notes
-      username   TEXT,            -- password notes
-      url        TEXT,            -- password notes
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+    ${notesTableSql('IF NOT EXISTS notes')};
     CREATE TABLE IF NOT EXISTS tags (
       id   INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE COLLATE NOCASE
@@ -64,11 +104,14 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
     if (!type) throw new ValidationError(`type must be one of: ${NOTE_TYPES.join(', ')}`);
     const title = String(input.title ?? '').trim();
     if (!title) throw new ValidationError('title is required');
-    const content = String(input.content ?? '');
+    let content = String(input.content ?? '');
+    if (type === 'password') content = cipher.encrypt(content);
+    if (type === 'changelog') content = JSON.stringify(normalizeChangelog(input.content));
+    if (type === 'todo') content = JSON.stringify(normalizeTodo(input.content));
     return {
       title,
       type,
-      content: type === 'password' ? cipher.encrypt(content) : content,
+      content,
       category: String(input.category ?? '').trim(),
       language: type === 'code' ? (String(input.language ?? '').trim() || null) : null,
       username: type === 'password' ? (String(input.username ?? '').trim() || null) : null,
@@ -146,10 +189,59 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
     }),
     categories: () => stmts.categories.all(),
     tags: () => stmts.tags.all(),
+    postgresSchema: () => postgresSchema(NOTE_TYPES),
+    // Read inside one transaction so the dump is a consistent snapshot.
+    postgresDump: db.transaction(() => postgresDump(db, NOTE_TYPES)),
     close: () => db.close(),
+  };
+}
+
+// Structured note content may arrive as an object or a JSON string.
+function parseJsonContent(content, type) {
+  if (typeof content !== 'string' && content != null) return content;
+  try {
+    return content ? JSON.parse(content) : {};
+  } catch {
+    throw new ValidationError(`${type} content must be valid JSON`);
+  }
+}
+
+// Changelog content is { entries: [{ version, date, changes: [{ kind, text }] }] }, newest
+// version first. A blank version means "Unreleased".
+function normalizeChangelog(content) {
+  const data = parseJsonContent(content, 'changelog');
+  const entries = Array.isArray(data?.entries) ? data.entries : [];
+  return {
+    entries: entries
+      .map((e) => ({
+        version: String(e?.version ?? '').trim(),
+        date: String(e?.date ?? '').trim(),
+        changes: (Array.isArray(e?.changes) ? e.changes : [])
+          .map((c) => ({
+            kind: CHANGE_KINDS.includes(c?.kind) ? c.kind : 'changed',
+            text: String(c?.text ?? '').trim(),
+          }))
+          .filter((c) => c.text),
+      }))
+      .filter((e) => e.version || e.date || e.changes.length),
+  };
+}
+
+// Todo content is { items: [{ text, done, due }] }; due is YYYY-MM-DD or blank.
+function normalizeTodo(content) {
+  const data = parseJsonContent(content, 'todo');
+  const items = Array.isArray(data?.items) ? data.items : [];
+  return {
+    items: items
+      .map((i) => ({
+        text: String(i?.text ?? '').trim(),
+        done: i?.done === true,
+        due: /^\d{4}-\d{2}-\d{2}$/.test(i?.due) ? i.due : '',
+      }))
+      .filter((i) => i.text),
   };
 }
 
 class ValidationError extends Error {}
 
-module.exports = { openStore, ValidationError, NOTE_TYPES };
+module.exports = { openStore, ValidationError, NOTE_TYPES, CHANGE_KINDS };

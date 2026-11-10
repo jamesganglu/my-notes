@@ -40,6 +40,13 @@ api.delete('/notes/:id', (req, res) => {
 api.get('/categories', (req, res) => res.json(store.categories()));
 api.get('/tags', (req, res) => res.json(store.tags()));
 
+const stamp = () => new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
+const sendSql = (res, filename, sql) =>
+  res.type('application/sql').attachment(filename).send(sql);
+
+api.get('/export/postgres/schema', (req, res) => sendSql(res, 'notes-schema.postgres.sql', store.postgresSchema()));
+api.get('/export/postgres/dump', (req, res) => sendSql(res, `notes-dump-${stamp()}.postgres.sql`, store.postgresDump()));
+
 app.use('/api', api);
 
 app.use((err, req, res, next) => {

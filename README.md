@@ -8,6 +8,8 @@ Note types:
 - **Markdown** — live preview while editing
 - **Code snippets** — syntax highlighting and a copy button
 - **Passwords** — username/URL fields, hidden until revealed, password generator; encrypted at rest (AES-256-GCM)
+- **Change logs** — versions with Added/Changed/Fixed/… entries in [Keep a Changelog](https://keepachangelog.com) format; copy as Markdown
+- **To-do lists** — tick items off from the view, optional due dates with overdue highlighting, progress bar
 
 Every note has a title, a category and tags. Notes can be filtered by type, category and tag, and searched.
 
@@ -45,3 +47,5 @@ Data lives in `data/notes.db`. Password notes are encrypted with a key from `dat
 | DELETE | `/api/notes/:id`           | Delete a note                                          |
 | GET    | `/api/categories`          | Categories with note counts                            |
 | GET    | `/api/tags`                | Tags with note counts                                  |
+| GET    | `/api/export/postgres/schema` | PostgreSQL schema (`CREATE TABLE …`) as a `.sql` download |
+| GET    | `/api/export/postgres/dump`   | PostgreSQL schema + all data as a `.sql` download    |

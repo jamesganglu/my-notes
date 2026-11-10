@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Notes</title>
+  <link rel="stylesheet" href="/vendor/hljs/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <button id="new-note" class="primary">+ New note</button>
+    <input id="search" type="search" placeholder="Search…" autocomplete="off" />
+
+    <h3>Type</h3>
+    <ul id="type-filter" class="filter">
+      <li data-value="">All</li>
+      <li data-value="text">Plain text</li>
+      <li data-value="markdown">Markdown</li>
+      <li data-value="code">Code</li>
+      <li data-value="password">Passwords</li>
+    </ul>
+
+    <h3>Categories</h3>
+    <ul id="category-filter" class="filter"></ul>
+
+    <h3>Tags</h3>
+    <div id="tag-filter" class="tag-cloud"></div>
+  </aside>
+
+  <section class="list">
+    <div id="active-filters" class="active-filters"></div>
+    <ul id="note-list"></ul>
+  </section>
+
+  <main id="detail" class="detail">
+    <div class="empty">Select a note or create a new one.</div>
+  </main>
+
+  <template id="view-tpl">
+    <header class="detail-head">
+      <div>
+        <h1 class="v-title"></h1>
+        <div class="meta">
+          <span class="badge v-type"></span>
+          <span class="v-category"></span>
+          <span class="v-dates"></span>
+        </div>
+        <div class="v-tags tags"></div>
+      </div>
+      <div class="actions">
+        <button class="v-edit">Edit</button>
+        <button class="v-delete danger">Delete</button>
+      </div>
+    </header>
+    <div class="v-body"></div>
+  </template>
+
+  <template id="edit-tpl">
+    <form class="editor">
+      <input name="title" placeholder="Title" required />
+      <div class="row">
+        <select name="type">
+          <option value="text">Plain text</option>
+          <option value="markdown">Markdown</option>
+          <option value="code">Code snippet</option>
+          <option value="password">Password</option>
+        </select>
+        <input name="category" placeholder="Category" list="category-options" />
+        <datalist id="category-options"></datalist>
+        <input name="language" class="only-code" placeholder="Language (e.g. js, python)" />
+      </div>
+      <div class="tag-picker">
+        <div class="tp-selected"></div>
+        <div class="tp-add">
+          <input class="tp-input" placeholder="Filter or add a tag…" autocomplete="off" />
+          <button type="button" class="tp-add-btn">Add tag</button>
+        </div>
+        <ul class="tp-list" role="listbox" aria-multiselectable="true" aria-label="Tags"></ul>
+      </div>
+      <div class="row only-password">
+        <input name="username" placeholder="Username / email" autocomplete="off" />
+        <input name="url" placeholder="URL" autocomplete="off" />
+      </div>
+      <div class="only-password pw-row">
+        <input name="password" type="password" placeholder="Password" autocomplete="new-password" />
+        <button type="button" class="pw-toggle">Show</button>
+        <button type="button" class="pw-generate">Generate</button>
+      </div>
+      <textarea name="content" class="not-password" placeholder="Write your note…" spellcheck="false"></textarea>
+      <div class="md-preview only-markdown"></div>
+      <div class="actions">
+        <button type="submit" class="primary">Save</button>
+        <button type="button" class="cancel">Cancel</button>
+      </div>
+    </form>
+  </template>
+
+  <script src="/vendor/marked/marked.umd.js"></script>
+  <script src="/vendor/dompurify/purify.min.js"></script>
+  <script src="/vendor/hljs/highlight.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

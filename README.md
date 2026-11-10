@@ -17,12 +17,14 @@ See the **[User Manual](docs/USER_MANUAL.md)** for a full guide to using the app
 
 ## Getting started
 
-Requires Node.js 20+.
+Requires **Node.js 10.12 – 18**. The app uses Express 4 and `better-sqlite3` 7.6.2, whose ready-made builds cover Node 10 to 18 on Windows, Linux (x64, ARM, Alpine) and macOS. Node.js 20 and newer are not supported, because `better-sqlite3` 7.6.2 has no builds for them.
+
+`npm install` warns that `marked` and `@highlightjs/cdn-assets` want a newer Node. Those packages are only served to the browser and never run in Node, so the warnings can be ignored.
 
 ```sh
 npm install
 npm start        # http://127.0.0.1:3000
-npm run dev      # auto-restart on changes
+npm run dev      # auto-restart on changes (nodemon)
 ```
 
 ## Configuration

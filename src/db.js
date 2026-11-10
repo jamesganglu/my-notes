@@ -8,6 +8,10 @@ const NOTE_TYPES = ['text', 'code', 'password', 'markdown', 'changelog', 'todo']
 // Keep a Changelog sections, in display order.
 const CHANGE_KINDS = ['added', 'changed', 'deprecated', 'removed', 'fixed', 'security'];
 
+// String value of v, or '' for null/undefined.
+const str = (v) => (v == null ? '' : String(v));
+const isObject = (v) => v != null && typeof v === 'object';
+
 const typeList = NOTE_TYPES.map((t) => `'${t}'`).join(',');
 const notesTableSql = (name) => `
   CREATE TABLE ${name} (
@@ -29,7 +33,8 @@ const notesTableSql = (name) => `
 function migrateNoteTypes(db, dbFile) {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notes'").get();
   if (!row) return;
-  const current = /CHECK\s*\(\s*type\s+IN\s*\(([^)]*)\)\s*\)/i.exec(row.sql)?.[1].replace(/\s/g, '');
+  const match = /CHECK\s*\(\s*type\s+IN\s*\(([^)]*)\)\s*\)/i.exec(row.sql);
+  const current = match && match[1].replace(/\s/g, '');
   if (current === typeList) return;
 
   const backup = dbFile.replace(/\.db$/, '') + `.backup-${Date.now()}.db`;
@@ -102,9 +107,9 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
   function normalize(input) {
     const type = NOTE_TYPES.includes(input.type) ? input.type : null;
     if (!type) throw new ValidationError(`type must be one of: ${NOTE_TYPES.join(', ')}`);
-    const title = String(input.title ?? '').trim();
+    const title = str(input.title).trim();
     if (!title) throw new ValidationError('title is required');
-    let content = String(input.content ?? '');
+    let content = str(input.content);
     if (type === 'password') content = cipher.encrypt(content);
     if (type === 'changelog') content = JSON.stringify(normalizeChangelog(input.content));
     if (type === 'todo') content = JSON.stringify(normalizeTodo(input.content));
@@ -112,15 +117,15 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
       title,
       type,
       content,
-      category: String(input.category ?? '').trim(),
-      language: type === 'code' ? (String(input.language ?? '').trim() || null) : null,
-      username: type === 'password' ? (String(input.username ?? '').trim() || null) : null,
-      url: type === 'password' ? (String(input.url ?? '').trim() || null) : null,
+      category: str(input.category).trim(),
+      language: type === 'code' ? (str(input.language).trim() || null) : null,
+      username: type === 'password' ? (str(input.username).trim() || null) : null,
+      url: type === 'password' ? (str(input.url).trim() || null) : null,
     };
   }
 
   function parseTags(tags) {
-    const list = Array.isArray(tags) ? tags : String(tags ?? '').split(',');
+    const list = Array.isArray(tags) ? tags : str(tags).split(',');
     return [...new Set(list.map((t) => String(t).trim().toLowerCase()).filter(Boolean))];
   }
 
@@ -159,11 +164,11 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
           OR (n.type IN ('text', 'markdown', 'code') AND ${like('n.content')})
           OR (n.type = 'todo' AND json_valid(n.content) AND EXISTS (
                 SELECT 1 FROM json_each(n.content, '$.items') i
-                WHERE ${like("i.value ->> 'text'")} OR ${like("i.value ->> 'due'")}))
+                WHERE ${like("json_extract(i.value, '$.text')")} OR ${like("json_extract(i.value, '$.due')")}))
           OR (n.type = 'changelog' AND json_valid(n.content) AND EXISTS (
                 SELECT 1 FROM json_each(n.content, '$.entries') e
-                WHERE ${like("e.value ->> 'version'")} OR ${like("e.value ->> 'date'")}
-                   OR EXISTS (SELECT 1 FROM json_each(e.value, '$.changes') c WHERE ${like("c.value ->> 'text'")})))
+                WHERE ${like("json_extract(e.value, '$.version')")} OR ${like("json_extract(e.value, '$.date')")}
+                   OR EXISTS (SELECT 1 FROM json_each(e.value, '$.changes') c WHERE ${like("json_extract(c.value, '$.text')")})))
           OR EXISTS (SELECT 1 FROM note_tags nt JOIN tags t ON t.id = nt.tag_id
                      WHERE nt.note_id = n.id AND ${like('t.name')}))`);
         // Match % and _ literally rather than as LIKE wildcards.
@@ -220,16 +225,18 @@ function parseJsonContent(content, type) {
 // version first. A blank version means "Unreleased".
 function normalizeChangelog(content) {
   const data = parseJsonContent(content, 'changelog');
-  const entries = Array.isArray(data?.entries) ? data.entries : [];
+  const entries = isObject(data) && Array.isArray(data.entries) ? data.entries : [];
   return {
     entries: entries
+      .filter(isObject)
       .map((e) => ({
-        version: String(e?.version ?? '').trim(),
-        date: String(e?.date ?? '').trim(),
-        changes: (Array.isArray(e?.changes) ? e.changes : [])
+        version: str(e.version).trim(),
+        date: str(e.date).trim(),
+        changes: (Array.isArray(e.changes) ? e.changes : [])
+          .filter(isObject)
           .map((c) => ({
-            kind: CHANGE_KINDS.includes(c?.kind) ? c.kind : 'changed',
-            text: String(c?.text ?? '').trim(),
+            kind: CHANGE_KINDS.includes(c.kind) ? c.kind : 'changed',
+            text: str(c.text).trim(),
           }))
           .filter((c) => c.text),
       }))
@@ -240,13 +247,14 @@ function normalizeChangelog(content) {
 // Todo content is { items: [{ text, done, due }] }; due is YYYY-MM-DD or blank.
 function normalizeTodo(content) {
   const data = parseJsonContent(content, 'todo');
-  const items = Array.isArray(data?.items) ? data.items : [];
+  const items = isObject(data) && Array.isArray(data.items) ? data.items : [];
   return {
     items: items
+      .filter(isObject)
       .map((i) => ({
-        text: String(i?.text ?? '').trim(),
-        done: i?.done === true,
-        due: /^\d{4}-\d{2}-\d{2}$/.test(i?.due) ? i.due : '',
+        text: str(i.text).trim(),
+        done: i.done === true,
+        due: /^\d{4}-\d{2}-\d{2}$/.test(i.due) ? i.due : '',
       }))
       .filter((i) => i.text),
   };

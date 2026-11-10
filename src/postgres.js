@@ -89,9 +89,9 @@ function postgresDump(db, noteTypes) {
   const tags = db.prepare('SELECT * FROM tags ORDER BY id').all();
   const noteTags = db.prepare('SELECT * FROM note_tags ORDER BY note_id, tag_id').all();
   const nextId = (table) => {
-    const seq = db.prepare('SELECT seq FROM sqlite_sequence WHERE name = ?').pluck().get(table) ?? 0;
-    const max = db.prepare(`SELECT MAX(id) FROM ${table}`).pluck().get() ?? 0;
-    return Math.max(seq, max) + 1;
+    const seq = db.prepare('SELECT seq FROM sqlite_sequence WHERE name = ?').pluck().get(table);
+    const max = db.prepare(`SELECT MAX(id) FROM ${table}`).pluck().get();
+    return Math.max(seq || 0, max || 0) + 1;
   };
 
   return header('dump') + `BEGIN;

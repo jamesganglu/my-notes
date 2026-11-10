@@ -41,8 +41,9 @@ api.get('/categories', (req, res) => res.json(store.categories()));
 api.get('/tags', (req, res) => res.json(store.tags()));
 
 const stamp = () => new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
+// attachment() sets a type from the file extension, so set the SQL type after it.
 const sendSql = (res, filename, sql) =>
-  res.type('application/sql').attachment(filename).send(sql);
+  res.attachment(filename).type('application/sql').send(sql);
 
 api.get('/export/postgres/schema', (req, res) => sendSql(res, 'notes-schema.postgres.sql', store.postgresSchema()));
 api.get('/export/postgres/dump', (req, res) => sendSql(res, `notes-dump-${stamp()}.postgres.sql`, store.postgresDump()));

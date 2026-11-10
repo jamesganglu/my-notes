@@ -153,11 +153,21 @@ function openStore(dataDir = path.join(__dirname, '..', 'data')) {
       }
       if (q) {
         // Password content is encrypted, so only its title/username/url/tags are searchable.
-        where.push(`(n.title LIKE @q OR n.category LIKE @q OR n.username LIKE @q OR n.url LIKE @q
-                     OR (n.type <> 'password' AND n.content LIKE @q)
-                     OR EXISTS (SELECT 1 FROM note_tags nt JOIN tags t ON t.id = nt.tag_id
-                                WHERE nt.note_id = n.id AND t.name LIKE @q))`);
-        params.q = `%${q}%`;
+        // Changelog and todo content is JSON, so only its text fields are searched (not keys).
+        const like = (expr) => `${expr} LIKE @q ESCAPE '\\'`;
+        where.push(`(${like('n.title')} OR ${like('n.category')} OR ${like('n.username')} OR ${like('n.url')}
+          OR (n.type IN ('text', 'markdown', 'code') AND ${like('n.content')})
+          OR (n.type = 'todo' AND json_valid(n.content) AND EXISTS (
+                SELECT 1 FROM json_each(n.content, '$.items') i
+                WHERE ${like("i.value ->> 'text'")} OR ${like("i.value ->> 'due'")}))
+          OR (n.type = 'changelog' AND json_valid(n.content) AND EXISTS (
+                SELECT 1 FROM json_each(n.content, '$.entries') e
+                WHERE ${like("e.value ->> 'version'")} OR ${like("e.value ->> 'date'")}
+                   OR EXISTS (SELECT 1 FROM json_each(e.value, '$.changes') c WHERE ${like("c.value ->> 'text'")})))
+          OR EXISTS (SELECT 1 FROM note_tags nt JOIN tags t ON t.id = nt.tag_id
+                     WHERE nt.note_id = n.id AND ${like('t.name')}))`);
+        // Match % and _ literally rather than as LIKE wildcards.
+        params.q = `%${String(q).replace(/[\\%_]/g, '\\$&')}%`;
       }
       const sql = `SELECT n.* FROM notes n ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
                    ORDER BY n.updated_at DESC, n.id DESC`;

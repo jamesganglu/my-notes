@@ -44,11 +44,15 @@ The window has three columns:
 
 | Column | What it holds |
 | --- | --- |
-| **Sidebar** (left) | The **+ New note** button, the search box, and filters for **Type**, **Categories** and **Tags**. |
+| **Sidebar** (left) | The **+ New note** button, the search box, filters for **Type**, **Categories** and **Tags**, the **Export** buttons, and the **Theme** buttons. |
 | **Note list** (middle) | The notes that match your current search and filters, newest-edited first. Each entry shows its type badge, title, category and a preview of the content. When a filter is active, a summary line at the top shows how many notes match. |
 | **Detail pane** (right) | The selected note, or the editor when you are creating or changing a note. |
 
 On a narrow window (such as a phone) the columns stack on top of each other.
+
+### Light and dark theme
+
+At the bottom of the sidebar, under **Theme**, click **White** for a light theme or **Dark** for a dark theme. The highlighted button shows the current theme. Your choice is remembered in this browser, so the app opens in the same theme next time. The app starts in the dark theme until you choose. Printing always uses black on white, whichever theme you pick.
 
 ---
 
@@ -185,7 +189,11 @@ Keyboard shortcuts in the filter box:
 
 ### Search
 
-Type in the **Search** box in the sidebar. Results update as you type. Search looks in each note's title, content, category, tags, and — for password notes — the username and URL. For change logs it searches the versions, dates and change descriptions; for to-do lists, the item descriptions and due dates.
+Type in the **Search** box in the sidebar. Results update as you type, and the line above the list shows how many notes matched.
+
+**Search always looks through all of your notes**, whatever type, category or tag filter is selected. While you're searching, the selected filters are greyed out to show they're paused. Clear the search box (or press **Esc**) to go back to your filtered view. Clicking a filter while searching clears the search and shows that filter instead.
+
+Search looks in each note's title, content, category, tags, and — for password notes — the username and URL. For change logs it searches the versions, dates and change descriptions; for to-do lists, the item descriptions and due dates. Search ignores capitalisation for unaccented letters (A–Z; accented letters such as `É` must match exactly), and characters such as `%` and `_` are matched literally.
 
 The password itself is never searched, because it is encrypted.
 
@@ -195,7 +203,7 @@ The password itself is never searched, because it is encrypted.
 - **Categories** — click a category to show only its notes, or *All* to clear. The number beside each is how many notes it has.
 - **Tags** — click a tag to show only notes with that tag; click it again to clear. You can also click any tag shown on an open note.
 
-Search and filters combine. For example, choosing **Code**, the category **Work** and searching `docker` shows only code notes in *Work* that mention docker. One category and one tag can be active at a time.
+Filters combine with each other. For example, choosing **Code** and the category **Work** shows only code notes in *Work*. One category and one tag can be active at a time.
 
 ---
 

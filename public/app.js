@@ -86,15 +86,21 @@ async function refreshSidebar() {
   state.allTags = tags;
 }
 
+// Choosing a filter means browsing, so it ends any search (search ignores filters).
 function setFilter(key, value) {
   state.filters[key] = value;
+  state.filters.q = '';
+  $('#search').value = '';
   refresh();
 }
 
 // ---------- list ----------
 
 async function refreshList() {
-  state.notes = await api.list(state.filters);
+  // A search always covers every note; type/category/tag filters are paused while searching.
+  const { q } = state.filters;
+  document.body.classList.toggle('searching', Boolean(q));
+  state.notes = await api.list(q ? { q } : state.filters);
   const list = $('#note-list');
   if (!state.notes.length) {
     list.replaceChildren(el('li', { className: 'none', textContent: 'No notes found.' }));
@@ -116,9 +122,10 @@ async function refreshList() {
   }
 
   const f = state.filters;
-  const active = [f.type && TYPE_LABELS[f.type], f.category && `in "${f.category}"`, f.tag && `#${f.tag}`, f.q && `matching "${f.q}"`]
-    .filter(Boolean);
-  $('#active-filters').textContent = active.length ? `${state.notes.length} note(s) · ${active.join(' · ')}` : '';
+  const active = [f.type && TYPE_LABELS[f.type], f.category && `in "${f.category}"`, f.tag && `#${f.tag}`].filter(Boolean);
+  $('#active-filters').textContent = q
+    ? `${state.notes.length} result(s) for "${q}" in all notes`
+    : active.length ? `${state.notes.length} note(s) · ${active.join(' · ')}` : '';
 }
 
 async function refresh() {
@@ -802,6 +809,28 @@ function generatePassword(length) {
   return out;
 }
 
+// ---------- theme ----------
+
+// The saved theme is applied before first paint by the inline script in index.html.
+const THEME_KEY = 'notes.theme';
+const HLJS_THEMES = { light: '/vendor/hljs/styles/github.min.css', dark: '/vendor/hljs/styles/github-dark.min.css' };
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  $('#hljs-theme').href = HLJS_THEMES[theme];
+  document.querySelectorAll('[data-theme-choice]').forEach((b) =>
+    b.setAttribute('aria-pressed', b.dataset.themeChoice === theme));
+}
+
+document.querySelectorAll('[data-theme-choice]').forEach((btn) => {
+  btn.onclick = () => {
+    const theme = btn.dataset.themeChoice;
+    applyTheme(theme);
+    try { localStorage.setItem(THEME_KEY, theme); } catch { /* storage unavailable: theme lasts this visit */ }
+  };
+});
+applyTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+
 // ---------- init ----------
 
 document.querySelectorAll('#type-filter li').forEach((li) => (li.onclick = () => setFilter('type', li.dataset.value)));
@@ -810,6 +839,14 @@ let searchTimer;
 $('#search').oninput = (e) => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => { state.filters.q = e.target.value.trim(); refreshList(); }, 200);
+};
+$('#search').onkeydown = (e) => {
+  if (e.key === 'Escape' && e.target.value) {
+    clearTimeout(searchTimer);
+    e.target.value = '';
+    state.filters.q = '';
+    refreshList();
+  }
 };
 
 refresh();

@@ -4,8 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Notes</title>
-  <link rel="stylesheet" href="/vendor/hljs/styles/github-dark.min.css" />
+  <link rel="stylesheet" id="hljs-theme" href="/vendor/hljs/styles/github-dark.min.css" />
   <link rel="stylesheet" href="/styles.css" />
+  <script>
+    // Apply the saved theme before first paint so the page doesn't flash dark.
+    (function () {
+      var theme = 'dark';
+      try { theme = localStorage.getItem('notes.theme') || 'dark'; } catch (e) {}
+      if (theme === 'light') {
+        document.documentElement.dataset.theme = 'light';
+        document.getElementById('hljs-theme').href = '/vendor/hljs/styles/github.min.css';
+      }
+    })();
+  </script>
 </head>
 <body>
   <aside class="sidebar">
@@ -35,6 +46,12 @@
          title="CREATE TABLE statements for an empty PostgreSQL database">Postgres schema</a>
       <a class="button" href="/api/export/postgres/dump" download
          title="Schema plus all notes, tags and links as PostgreSQL INSERT statements">Postgres dump</a>
+    </div>
+
+    <h3>Theme</h3>
+    <div class="theme-switch" role="group" aria-label="Theme">
+      <button type="button" data-theme-choice="light">White</button>
+      <button type="button" data-theme-choice="dark">Dark</button>
     </div>
   </aside>
 

@@ -11,6 +11,8 @@ Note types:
 
 Every note has a title, a category and tags. Notes can be filtered by type, category and tag, and searched.
 
+See the **[User Manual](docs/USER_MANUAL.md)** for a full guide to using the app.
+
 ## Getting started
 
 Requires Node.js 20+.
